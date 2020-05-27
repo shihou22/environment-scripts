@@ -1,0 +1,65 @@
+#!/bin/bash
+
+zones=$(aws route53 list-hosted-zones --output json | jq -c ".HostedZones")
+#echo ${zones}
+
+echo '-------------------------'
+
+tStamp=`date '+%Y%m%d_%H%M%S'`
+mkdir $tStamp
+outLen=$(echo ${zones} | jq length)
+
+for i in $( seq 0 $((${outLen} - 1)) ); do
+    outRow=$(echo ${zones} | jq .[${i}])
+    id=$(echo ${outRow} | jq -r ."Id");
+    name=$(echo ${outRow} | jq -r ."Name");
+    #echo ${id}
+    #echo ${name}
+    #HostedZonesのrecordsetsを取得
+    recordsets=$(aws route53 list-resource-record-sets --hosted-zone-id ${id} --output json | jq -c ".ResourceRecordSets")  
+
+    #echo ${id##*/}
+    OUTPUT=./$tStamp/${id##*/}'.json'
+
+    #exit 1
+
+    echo '{ "Comment": "Alilas for '${id}'",     "Changes": [' >>${OUTPUT}
+    #recordsetの要素カウント
+    len=$(echo ${recordsets} | jq length)
+    #行末カウント用
+    cnt=0
+    #echo '-len-'${len}
+    #loop内でjson作成
+    strFrontB='{    "Action": "CREATE", "ResourceRecordSet":'    
+    strBackB='},'
+    for j in $( seq 0 $((${len} - 1)) ); do
+        let cnt++   
+        #行単位で取得
+        row=$(echo ${recordsets} | jq .[$j])
+        #echo ${row}
+        type=$(echo ${row} | jq -r ."Type");
+        #NSとSOAは必ず作成されるので除外
+        if [ 'NS' = ${type} ]; then
+            continue
+        fi
+        if [ 'SOA' = ${type} ]; then
+            continue
+        fi
+        #row作成
+        tmpName=$(echo ${row} | jq -r ."Name")
+        #echo ${tmpName} | sed s/.${name}//g
+        #repname=`echo ${tmpName} | sed s/.${name}//g`
+
+        echo ${strFrontB} >>${OUTPUT}
+        echo ${row} >>${OUTPUT}
+        #echo ${row} | sed s/${tmpName}/${repname}/g >>${OUTPUT}
+        if [ ${cnt} = ${len} ]; then
+            echo '}' >>${OUTPUT}
+        else
+            echo '},' >>${OUTPUT}
+        fi
+    done
+    echo ']}' >>${OUTPUT}
+    #create用jsonの締め
+    #echo ${strRes}
+done
