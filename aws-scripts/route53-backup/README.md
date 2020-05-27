@@ -2,7 +2,9 @@
 This script is backup-script for AWS Route53
 
 #condition
-AWS CLI rrequired.
+AWS CLI required.
+jq required.
+- sudo apt-get install jq.
 
 #How to use
 $> bash route53-bk-aws-cli
